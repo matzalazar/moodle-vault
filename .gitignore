@@ -1,0 +1,48 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# --- Entornos virtuales ---
+.venv/
+venv/
+env/
+ENV/
+
+# --- Configuración ---
+config/*/creds.txt
+config/*/course_links.json
+.env
+*.env
+
+# --- Datos generados ---
+data/*/course/*
+data/*/trees/*
+
+# Mantener carpetas vacías versionadas
+!.gitkeep
+
+# --- Archivos temporales ---
+*.tmp
+*.swp
+*.swo
+
+# --- Archivos del sistema ---
+.DS_Store
+Thumbs.db
+
+# --- IDE ---
+.vscode/
+.idea/
+.claude/
+*.iml
+
+# --- Tests ---
+.pytest_cache/
+
+# --- Logs ---
+logs/*.log
+logs/.*.log
+!logs/example.log

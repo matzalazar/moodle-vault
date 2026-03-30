@@ -1,0 +1,75 @@
+[-] available platforms:
+  [1] platform_a
+  [2] platform_b
+select a platform (number): [+] selected platform: platform_b
+
+[-] re-scrape weeks with late-uploaded content?
+  [0] no  (default)
+  [1] last week
+  [2] last two weeks
+option:
+[-] running scraper (platform_b)...
+[+] opening login page...
+[+] session started successfully.
+track "2026-1stT-NNN-SUBJECT_A-DEPT NAME-[LECTURER A]/[LECTURER B]-GROUP A"? (y/n): track "2026-1stT-NNN-SUBJECT_B-DEPT NAME-[LECTURER B]/[LECTURER A]-GROUP A"? (y/n): track "2026-1stT-NNN-SUBJECT_C-DEPT NAME-[LECTURER A]/[LECTURER B]-GROUP A"? (y/n): [+] course links saved to /path/to/project/config/platform_b/course_links.json
+[+] opening login page...
+[+] session started successfully.
+[+] processing course: 2026-1stT-NNN-SUBJECT_A-DEPT NAME-[LECTURER A]/[LECTURER B]-GROUP A
+[+] structure saved to /path/to/project/data/platform_b/trees/2026-1_T-NNN-SUBJECT_A.json
+[+] processing course: 2026-1stT-NNN-SUBJECT_B-DEPT NAME-[LECTURER B]/[LECTURER A]-GROUP A
+[+] structure saved to /path/to/project/data/platform_b/trees/2026-1_T-NNN-SUBJECT_B.json
+[+] processing course: 2026-1stT-NNN-SUBJECT_C-DEPT NAME-[LECTURER A]/[LECTURER B]-GROUP A
+[+] structure saved to /path/to/project/data/platform_b/trees/2026-1_T-NNN-SUBJECT_C.json
+[+] done.
+[+] opening login page...
+[+] session started successfully.
+[+] processing downloads for: 01_SUBJECT_A
+[+] processing topic: Announcements_Forum [other]
+[!] no downloadable files found in 'Announcements_Forum'
+[+] external link (https://lms.example.edu/mod/url/view.php?id=XXXXXXX...), skipping: Study_plan
+[+] processing topic: Syllabus_and_course_intro [folder]
+[+] downloaded: Course_Introduction.pdf
+[+] downloaded: Syllabus_Cod_NNN_Subject_A.pdf
+[+] external link (https://lms.example.edu/mod/url/view.php?id=XXXXXXX...), skipping: Online_resource_I
+[+] external link (https://lms.example.edu/mod/url/view.php?id=XXXXXXX...), skipping: Live_sessions_link
+[+] processing topic: Reading_material_UNIT_I [folder]
+[+] downloaded: Unit_1_Subject_A_Part_1_Cod_NNN.pdf
+[+] downloaded: Unit_1_Subject_A_Part_2_Cod_NNN.pdf
+[+] downloaded: Unit_1_Subject_A_Part_3_Cod_NNN.pdf
+[+] external link (https://lms.example.edu/mod/url/view.php?id=XXXXXXX...), skipping: Online_resource_II
+[+] processing topic: Assignments [folder]
+[!] no downloadable files found in 'Assignments'
+[+] processing topic: Reading_material_UNIT_II [folder]
+[+] downloaded: Unit_2_Subject_A_Part_1_Cod_NNN.pdf
+[+] downloaded: Unit_2_Subject_A_Part_2_Cod_NNN.pdf
+[+] downloaded: Unit_2_Subject_A_Part_3_Cod_NNN.pdf
+[+] processing downloads for: 02_SUBJECT_B
+[+] processing topic: Announcements_Forum [other]
+[!] no downloadable files found in 'Announcements_Forum'
+[+] external link (https://lms.example.edu/mod/url/view.php?id=XXXXXXX...), skipping: Study_plan
+[+] processing topic: Syllabus_and_course_intro [folder]
+[+] downloaded: Schedule_Subject_B_2026.pdf
+[+] downloaded: Introduction_Subject_B_2026.pdf
+[+] external link (https://lms.example.edu/mod/url/view.php?id=XXXXXXX...), skipping: Live_sessions_link
+[+] external link (https://lms.example.edu/mod/url/view.php?id=XXXXXXX...), skipping: Recorded_sessions
+[+] processing topic: Weekly_guide [folder]
+[!] no downloadable files found in 'Weekly_guide'
+[+] processing topic: Reading_material [folder]
+[!] no downloadable files found in 'Reading_material'
+[+] processing downloads for: 03_SUBJECT_C
+[+] processing topic: Announcements_Forum [other]
+[!] no downloadable files found in 'Announcements_Forum'
+[+] external link (https://lms.example.edu/mod/url/view.php?id=XXXXXXX...), skipping: Study_plan
+[+] processing topic: Syllabus_and_course_intro [folder]
+[+] downloaded: Course_Presentation_2026.pdf
+[+] downloaded: Syllabus.pdf
+[+] external link (https://lms.example.edu/mod/url/view.php?id=XXXXXXX...), skipping: Live_sessions_link
+[+] processing topic: Weekly_guide [folder]
+[+] downloaded: guide1.pdf
+[+] processing topic: Reading_material [folder]
+[+] downloaded: Unit_1_Subject_C_Intro_Cod_NNN.pdf
+[+] processing topic: Assignments [folder]
+[!] no downloadable files found in 'Assignments'
+[+] download complete.
+[+] download log: logs/platform_b_downloads_YYYYMMDD-HHMMSS.log
+[+] done.
