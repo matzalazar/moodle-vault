@@ -77,25 +77,23 @@ def login_moodle(
     logger.info("opening login page...")
     browser.get(login_url)
 
+    wait = WebDriverWait(browser, 10)
+
     try:
-        # Esperar a que el formulario de login esté disponible antes de
-        # interactuar con él; evita errores por tiempos de carga variables.
-        WebDriverWait(browser, 10).until(
-            EC.presence_of_element_located((By.ID, "username"))
-        )
+        # Esperar a que el formulario sea visible e interactuable antes de
+        # buscar los elementos; evita StaleElementReferenceException cuando
+        # Moodle re-renderiza el DOM después de cargar sus scripts.
+        wait.until(EC.visibility_of_element_located((By.ID, "username")))
     except TimeoutException:
         logger.error("login page did not load within the expected time.")
         browser.quit()
         sys.exit(1)
 
     try:
-        user_input   = browser.find_element(By.ID, "username")
-        pass_input   = browser.find_element(By.ID, "password")
-        login_button = browser.find_element(By.ID, "loginbtn")
-
-        user_input.send_keys(username)
-        pass_input.send_keys(password)
-        login_button.click()
+        # Re-buscar cada elemento justo antes de usarlo para evitar stale refs.
+        wait.until(EC.element_to_be_clickable((By.ID, "username"))).send_keys(username)
+        wait.until(EC.element_to_be_clickable((By.ID, "password"))).send_keys(password)
+        wait.until(EC.element_to_be_clickable((By.ID, "loginbtn"))).click()
 
         # Moodle redirige fuera de la página de login tras un login exitoso.
         # Esperar hasta que eso ocurra; si no ocurre en 15 s, las credenciales
