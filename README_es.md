@@ -32,6 +32,7 @@ Herramienta de línea de comandos para descargar, organizar y archivar el conten
 - Re-scraping selectivo de semanas anteriores para contenido subido con retraso.
 - Procesamiento incremental: los temas ya procesados se omiten en ejecuciones posteriores.
 - Soporte para múltiples instancias Moodle mediante archivos de configuración independientes.
+- **Soporte para múltiples temas de Moodle**: estrategias de scraping intercambiables para los temas Classic/Boost y Tiles.
 - Integración opcional con [Todoist](https://www.todoist.com) y [Notion](https://www.notion.so), configurable por plataforma desde `.env`.
 - Registro de descargas con metadatos (fecha, curso, semana, tema, archivo).
 
@@ -67,7 +68,7 @@ moodle run
 ```
 cli/
 ├── __init__.py
-└── commands.py            # Todos los comandos Typer (moodle run/status/fetch/sync/download)
+└── commands.py            # Todos los comandos Typer (moodle run/status/fetch/sync/download/export)
 
 scripts/
 ├── platform.py            # Dataclass PlatformConfig, load_platform(), list_platforms()
@@ -76,9 +77,14 @@ scripts/
 │   ├── selectors.py       # Selectores CSS y constantes de Selenium
 │   ├── session.py         # Gestión del navegador y autenticación
 │   ├── fetch_links.py     # Etapa 1: extracción de URLs de cursos
-│   ├── extract_course_tree.py  # Etapa 2: generación de árboles jerárquicos
+│   ├── extract_course_tree.py  # Etapa 2: generación de árboles jerárquicos (dispatcher de estrategia)
+│   ├── extract_dates.py   # Parseo de rangos de fecha compartido entre estrategias
 │   ├── reset_semanas.py   # Etapa 3: re-scraping de semanas recientes
-│   └── download_files.py  # Etapa 4: descarga de archivos
+│   ├── download_files.py  # Etapa 4: descarga de archivos
+│   └── strategies/
+│       ├── base.py        # ABC ScraperStrategy
+│       ├── classic.py     # Tema Classic/Boost: recorrido DOM con Selenium
+│       └── tiles.py       # Tema Tiles: BeautifulSoup + requests con cookies del navegador
 └── integrations/
     ├── todoist.py         # Integración con Todoist (opcional)
     └── notion.py          # Integración con Notion (opcional)
@@ -95,7 +101,7 @@ data/
     └── course/            # Archivos descargados organizados por curso
 
 logs/                      # Registro de descargas por sesión
-tests/                     # Suite de tests unitarios (111 tests)
+tests/                     # Suite de tests unitarios (131 tests)
 main.py                    # Punto de entrada alternativo (sin instalación)
 pyproject.toml             # Definición del paquete y puntos de entrada
 requirements.txt           # Lista plana de dependencias
@@ -129,7 +135,8 @@ Crear un archivo en `config/platforms/<nombre>.json`:
 ```json
 {
   "display_name": "Nombre de la plataforma",
-  "login_url": "https://campus.universidad.edu/login/index.php"
+  "login_url": "https://campus.universidad.edu/login/index.php",
+  "theme": "classic"
 }
 ```
 
@@ -141,6 +148,27 @@ MIPLATAFORMA_PASSWORD=contraseña
 ```
 
 Cada plataforma tiene su propio directorio de datos en `config/<nombre>/` y `data/<nombre>/`.
+
+## Temas de Moodle
+
+El campo `theme` en el JSON de la plataforma selecciona la estrategia de scraping que se usa durante la etapa `sync`.
+
+| Valor | Tema de Moodle | Estrategia |
+|---|---|---|
+| `classic` (por defecto) | Classic / Boost | Recorrido DOM con Selenium usando selectores `li.section.main` y `li.activity` |
+| `tiles` | Tiles | Parseo con BeautifulSoup de tiles `li[id^="tile-"]`; páginas de sección obtenidas con requests usando las cookies del navegador |
+
+Ambas estrategias producen el mismo formato JSON de árbol, por lo que el resto del pipeline (merge, descarga) no se ve afectado.
+
+Si se omite `theme`, se usa `"classic"` por defecto.
+
+### Agregar soporte para un nuevo tema de Moodle
+
+1. Crear `scripts/scraper/strategies/<tema>.py` con una clase que extienda `ScraperStrategy` e implemente `extraer_secciones(browser, curso_url) -> list[dict]`.
+2. Registrarla en `scripts/scraper/strategies/__init__.py` agregando una entrada en `_STRATEGIES`.
+3. Configurar `"theme": "<tema>"` en el JSON de la plataforma.
+
+El método recibe el browser ya posicionado en la URL del curso, con los popups cerrados. Debe devolver una lista de dicts de sección con las claves: `titulo`, `titulo_directorio`, `orden`, `fecha_inicio`, `fecha_fin` y `temas` (cada uno con `nombre`, `tipo`, `url`).
 
 ## Uso
 
@@ -211,6 +239,26 @@ moodle download --yes
 ```
 
 Opciones: `--platform / -p`, `--rescrape / -r`, `--verbose / -v`, `--yes / -y`
+
+### `moodle export` — exportar árbol de cursos a Markdown
+
+Lee los árboles JSON almacenados localmente (sin necesidad de navegador) y genera un archivo `.md` con el listado de cursos, secciones e ítems.
+
+```bash
+moodle export
+moodle export --platform miplataforma
+moodle export --platform miplataforma --output ~/Documents/miplataforma.md
+```
+
+El archivo de salida por defecto es `data/<plataforma>/<plataforma>_export.md`.
+
+Opciones:
+
+| Flag | Corto | Descripción |
+|------|-------|-------------|
+| `--platform` | `-p` | Nombre de la plataforma (omite el menú de selección) |
+| `--output` | `-o` | Ruta de salida personalizada para el archivo `.md` |
+| `--verbose` | `-v` | Activar logging debug |
 
 ## Selección de cursos
 
