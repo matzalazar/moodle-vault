@@ -25,8 +25,8 @@ logger = logging.getLogger(__name__)
 
 
 def get_credentials(platform_name: str) -> tuple[str, str]:
-    username = os.getenv(f"{platform_name.upper()}_USERNAME")
-    password = os.getenv(f"{platform_name.upper()}_PASSWORD")
+    username = (os.getenv(f"{platform_name.upper()}_USERNAME") or "").strip()
+    password = (os.getenv(f"{platform_name.upper()}_PASSWORD") or "").strip()
     if not username or not password:
         logger.error(
             "variables %s_USERNAME / _PASSWORD no encontradas en .env",
@@ -48,9 +48,14 @@ def _find_chrome_binary() -> str | None:
 
 def init_browser() -> webdriver.Chrome | None:
     options = Options()
-    options.add_argument("--headless")
+    options.add_argument("--headless=new")
     options.add_argument("--window-size=1920,1080")
     options.add_argument("--disable-gpu")
+    # Evitar que Chromium se identifique como browser controlado por automation;
+    # algunos Moodle/WAF rechazan el login si detectan el flag navigator.webdriver.
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    options.add_experimental_option("useAutomationExtension", False)
 
     binary = _find_chrome_binary()
     if binary:
@@ -90,9 +95,29 @@ def login_moodle(
         sys.exit(1)
 
     try:
-        # Re-buscar cada elemento justo antes de usarlo para evitar stale refs.
-        wait.until(EC.element_to_be_clickable((By.ID, "username"))).send_keys(username)
-        wait.until(EC.element_to_be_clickable((By.ID, "password"))).send_keys(password)
+        # Usar JS para llenar los campos evita problemas de keyboard layout
+        # con caracteres especiales en la contraseña (send_keys depende del
+        # layout del SO y puede mapear mal ciertos símbolos).
+        wait.until(EC.element_to_be_clickable((By.ID, "username")))
+        wait.until(EC.element_to_be_clickable((By.ID, "password")))
+        # Setear por ID directo en lugar de referencias que pueden ser stale
+        browser.execute_script(
+            "var u = document.getElementById('username');"
+            "u.value = arguments[0];"
+            "u.dispatchEvent(new Event('input', {bubbles:true}));"
+            "u.dispatchEvent(new Event('change', {bubbles:true}));",
+            username,
+        )
+        browser.execute_script(
+            "var p = document.getElementById('password');"
+            "p.value = arguments[0];"
+            "p.dispatchEvent(new Event('input', {bubbles:true}));"
+            "p.dispatchEvent(new Event('change', {bubbles:true}));",
+            password,
+        )
+        pre_user = browser.execute_script("return document.getElementById('username').value")
+        pre_pass = browser.execute_script("return document.getElementById('password').value")
+        logger.info("pre-submit: user=%d chars, pass=%d chars", len(pre_user or ""), len(pre_pass or ""))
         wait.until(EC.element_to_be_clickable((By.ID, "loginbtn"))).click()
 
         # Moodle redirige fuera de la página de login tras un login exitoso.
@@ -106,7 +131,22 @@ def login_moodle(
         return browser
 
     except TimeoutException:
-        logger.error("login failed. check your credentials in .env.")
+        current_url = browser.current_url
+        logger.error("login failed (timeout). URL actual: %s", current_url)
+        try:
+            for selector in ("#loginerrormessage", ".loginerrors", ".alert-danger"):
+                el = browser.find_elements(By.CSS_SELECTOR, selector)
+                if el:
+                    logger.error("mensaje de Moodle: %s", el[0].text.strip())
+                    break
+        except Exception:
+            pass
+        try:
+            screenshot_path = "logs/login_debug.png"
+            browser.save_screenshot(screenshot_path)
+            logger.error("screenshot guardado en %s", screenshot_path)
+        except Exception:
+            pass
         browser.quit()
         sys.exit(1)
     except Exception as e:

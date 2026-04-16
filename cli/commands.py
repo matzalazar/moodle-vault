@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import sys
+from pathlib import Path
 from typing import Optional
 
 import typer
@@ -488,3 +489,82 @@ def download(
 
     _run_integrations(name)
     logger.success("Download complete.")
+
+
+# ---------------------------------------------------------------------------
+# export
+# ---------------------------------------------------------------------------
+
+@app.command()
+def export(
+    platform: Optional[str] = typer.Option(None, "--platform", "-p", help="Platform name"),
+    output: Optional[str] = typer.Option(None, "--output", "-o", help="Output .md file path"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable debug logging"),
+) -> None:
+    """
+    Export the course tree to a Markdown file.
+
+    Reads the locally-stored JSON trees (no browser required) and writes a
+    structured .md with every section and item title.
+    """
+    _configure_logging(verbose)
+
+    name = _select_platform(platform)
+
+    try:
+        platform_cfg = load_platform(name)
+    except Exception as exc:
+        logger.error(f"Failed to load platform: {exc}")
+        raise typer.Exit(code=1) from exc
+
+    if not platform_cfg.tree_dir.exists():
+        logger.error(f"Tree directory not found: {platform_cfg.tree_dir}")
+        logger.error("Run 'sync' first to build the course tree.")
+        raise typer.Exit(code=1)
+
+    tree_files = sorted(platform_cfg.tree_dir.glob("*.json"))
+    if not tree_files:
+        logger.error(f"No course trees found in {platform_cfg.tree_dir}")
+        raise typer.Exit(code=1)
+
+    lines: list[str] = []
+    for tree_file in tree_files:
+        try:
+            data = json.loads(tree_file.read_text(encoding="utf-8"))
+        except Exception as exc:
+            logger.warning(f"Could not read {tree_file.name}: {exc}")
+            continue
+
+        course_name = data.get("curso", tree_file.stem)
+        # Moodle sometimes repeats the title with a newline — keep only the first line.
+        course_name = course_name.split("\n")[0].strip()
+
+        lines.append(f"## {course_name}")
+        lines.append("")
+
+        for seccion in data.get("semanas", []):
+            titulo = seccion.get("titulo", "(sin título)").strip()
+            lines.append(f"### {titulo}")
+
+            temas = seccion.get("temas", [])
+            if temas:
+                for tema in temas:
+                    nombre = tema.get("nombre", "").strip()
+                    if nombre:
+                        lines.append(f"- {nombre}")
+            lines.append("")
+
+    if not lines:
+        logger.warning("Nothing to export.")
+        raise typer.Exit(code=0)
+
+    md_content = "\n".join(lines)
+
+    if output:
+        out_path = Path(output)
+    else:
+        out_path = platform_cfg.tree_dir.parent / f"{name}_export.md"
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(md_content, encoding="utf-8")
+    logger.success(f"Exported to {out_path}")

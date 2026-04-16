@@ -24,12 +24,14 @@ def _make_platform_config(
     display_name: str = "My Platform",
     login_url: str = "https://example.com/login",
     base: Path = Path("/tmp/nonexistent"),
+    theme: str = "classic",
 ) -> PlatformConfig:
     """Returns a minimal PlatformConfig for use in tests."""
     return PlatformConfig(
         name=name,
         display_name=display_name,
         login_url=login_url,
+        theme=theme,
         course_links_path=base / "course_links.json",
         tree_dir=base / "trees",
         course_dir=base / "course",
