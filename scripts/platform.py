@@ -19,6 +19,7 @@ class PlatformConfig:
     name: str
     display_name: str
     login_url: str
+    theme: str
     course_links_path: Path
     tree_dir: Path
     course_dir: Path
@@ -37,6 +38,7 @@ def load_platform(name: str) -> PlatformConfig:
         name=name,
         display_name=data.get("display_name", name),
         login_url=data["login_url"],
+        theme=data.get("theme", "classic"),
         course_links_path=BASE_DIR / "config" / name / "course_links.json",
         tree_dir=BASE_DIR / "data" / name / "trees",
         course_dir=BASE_DIR / "data" / name / "course",

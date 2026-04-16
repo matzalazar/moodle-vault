@@ -1,6 +1,7 @@
 import datetime
 import pytest
-from scripts.scraper.extract_course_tree import parsear_rango_semana, merge_secciones
+from scripts.scraper.extract_dates import parsear_rango_semana
+from scripts.scraper.extract_course_tree import merge_secciones
 
 
 class TestParsearRangoSemana:

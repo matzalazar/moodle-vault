@@ -1,4 +1,5 @@
 {
   "display_name": "Campus Virtual UPSO",
-  "login_url": "https://campusvirtual.upso.edu.ar/login/index.php"
+  "login_url": "https://campusvirtual.upso.edu.ar/login/index.php",
+  "theme": "classic"
 }

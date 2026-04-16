@@ -1,4 +1,5 @@
 {
   "display_name": "FADENA - UNDEF",
-  "login_url": "https://campus.fadena.undef.edu.ar/login/index.php"
+  "login_url": "https://campus.fadena.undef.edu.ar/login/index.php",
+  "theme": "tiles"
 }
