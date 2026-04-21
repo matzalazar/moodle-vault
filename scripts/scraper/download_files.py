@@ -18,6 +18,7 @@ from pathlib import Path
 from urllib.parse import urlparse, unquote
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+from bs4 import BeautifulSoup
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -170,6 +171,33 @@ def obtener_cookies_selenium(browser: webdriver.Chrome) -> dict[str, str]:
     return {c["name"]: c["value"] for c in browser.get_cookies()}
 
 
+def _extraer_url_inline(
+    view_url: str,
+    cookies: dict,
+    host_moodle: str | None,
+    http_session: requests.Session,
+) -> str | None:
+    """GET al visor HTML de un resource y busca la URL real del archivo.
+
+    Moodle incrusta el archivo en un <object data="...">, <embed src="...">,
+    <iframe src="..."> o <a href="..."> apuntando a pluginfile.php.
+    Devuelve la primera URL encontrada, o None si no hay ninguna.
+    """
+    try:
+        r = http_session.get(view_url, cookies=cookies, allow_redirects=True, timeout=_DOWNLOAD_TIMEOUT)
+        r.raise_for_status()
+    except Exception as e:
+        logger.debug("inline fallback GET failed for %s: %s", view_url, e)
+        return None
+
+    soup = BeautifulSoup(r.text, "lxml")
+    for tag in soup.find_all(["object", "embed", "iframe", "a"]):
+        src = tag.get("data") or tag.get("src") or tag.get("href") or ""
+        if "pluginfile.php" in src and es_dominio_moodle(src, host_moodle):
+            return src
+    return None
+
+
 def procesar_curso(
     browser: webdriver.Chrome,
     curso_json: dict,
@@ -245,6 +273,11 @@ def procesar_curso(
                 # cierra la pestaña automáticamente al disparar la descarga,
                 # lo que rompe la sesión Selenium. Se resuelve la redirección
                 # via HTTP y se descarga sin abrir pestaña nueva.
+                #
+                # Cuando Moodle está configurado para mostrar el archivo inline,
+                # el HEAD no redirige a pluginfile.php sino que devuelve la página
+                # HTML del visor. En ese caso se hace GET y se parsea el HTML para
+                # encontrar la URL real del archivo.
                 try:
                     r_head = http_session.head(
                         tema_url,
@@ -260,7 +293,16 @@ def procesar_curso(
                         if nombre:
                             registrar_descarga_log(nombre, curso_json["curso"], semana["titulo"], tema_nombre_raw, platform_name)
                     else:
-                        logger.warning("resource has no direct downloadable file: %s -> %s", tema_nombre, final_url)
+                        # Fallback: Moodle puede estar sirviendo el archivo dentro de
+                        # un visor HTML. Se busca la URL real en object/embed/iframe/a.
+                        file_url = _extraer_url_inline(tema_url, cookies, host_moodle, http_session)
+                        if file_url:
+                            label = inferir_nombre(file_url, tema_nombre)
+                            nombre = descargar_archivo(file_url, destino_dir, label, cookies, host_moodle, http_session)
+                            if nombre:
+                                registrar_descarga_log(nombre, curso_json["curso"], semana["titulo"], tema_nombre_raw, platform_name)
+                        else:
+                            logger.warning("resource has no direct downloadable file: %s -> %s", tema_nombre, final_url)
                     curso_json["semanas"][s_idx]["temas"][t_idx]["revisado"] = True
                 except Exception as e:
                     logger.error("error processing resource '%s': %s", tema_nombre, e)
