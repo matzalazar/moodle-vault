@@ -81,14 +81,18 @@ def _tile_section_links(soup: BeautifulSoup) -> list[dict]:
             continue
 
         href = link.get("href", "")
-        section = _extract_section_number(href)
+        # Prefer the data-section attribute on the <li> over URL parsing.
+        # Format Tiles 4.x changed the href to /course/section.php?id=<db_id>
+        # (database row ID, not section order number), but data-section always
+        # holds the correct ordinal number.
+        section = tile.get("data-section") or _extract_section_number(href)
         if not section or section in seen:
             continue
 
-        seen.add(section)
+        seen.add(str(section))
         title = _safe_name(link.get_text(" ", strip=True))
         tiles.append({
-            "section": section,
+            "section": str(section),
             "url": href,
             "title": title or f"sección {section}",
         })

@@ -120,21 +120,30 @@ def login_moodle(
         logger.info("pre-submit: user=%d chars, pass=%d chars", len(pre_user or ""), len(pre_pass or ""))
         wait.until(EC.element_to_be_clickable((By.ID, "loginbtn"))).click()
 
-        # Moodle redirige fuera de la página de login tras un login exitoso.
-        # Esperar hasta que eso ocurra; si no ocurre en 15 s, las credenciales
-        # fallaron o la redirección no se completó.
+        # Esperar a que la URL cambie respecto al momento del submit.
+        # Usar la URL exacta en lugar de buscar ausencia de "login", porque en
+        # maintenance mode Moodle puede redirigir a /maintenance.php o a
+        # /login/index.php?maintenance=1 — ambas romperían el check anterior.
+        url_before_submit = login_url
         WebDriverWait(browser, 15).until(
-            lambda d: "login" not in d.current_url
+            lambda d: d.current_url != url_before_submit
         )
 
-        logger.info("login successful.")
+        # Detectar maintenance mode explícitamente para dar un error claro.
+        if "maintenance" in browser.current_url:
+            logger.error("el campus está en modo mantenimiento. URL: %s", browser.current_url)
+            browser.save_screenshot("logs/login_debug.png")
+            browser.quit()
+            sys.exit(1)
+
+        logger.info("login successful. URL: %s", browser.current_url)
         return browser
 
     except TimeoutException:
         current_url = browser.current_url
         logger.error("login failed (timeout). URL actual: %s", current_url)
         try:
-            for selector in ("#loginerrormessage", ".loginerrors", ".alert-danger"):
+            for selector in ("#loginerrormessage", ".loginerrors", ".alert-danger", ".maintenance-mode"):
                 el = browser.find_elements(By.CSS_SELECTOR, selector)
                 if el:
                     logger.error("mensaje de Moodle: %s", el[0].text.strip())
