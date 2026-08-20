@@ -3,7 +3,12 @@ import pytest
 from pathlib import Path
 
 import scripts.platform as platform_module
-from scripts.platform import PlatformConfig, load_platform, list_platforms
+from scripts.platform import (
+    PlatformConfig,
+    cargar_cursos_seguimiento,
+    load_platform,
+    list_platforms,
+)
 
 
 @pytest.fixture
@@ -91,3 +96,35 @@ class TestListPlatforms:
         (platforms_dir / "readme.txt").write_text("ignorame", encoding="utf-8")
         result = list_platforms()
         assert result == ["real"]
+
+
+class TestCargarCursosSeguimiento:
+    def _write(self, tmp_path: Path, data) -> Path:
+        p = tmp_path / "course_links.json"
+        p.write_text(json.dumps(data), encoding="utf-8")
+        return p
+
+    def test_filtra_por_seguimiento(self, tmp_path: Path):
+        path = self._write(tmp_path, [
+            {"nombre": "Curso A", "url": "https://x.com/1", "seguimiento": True},
+            {"nombre": "Curso B", "url": "https://x.com/2", "seguimiento": False},
+        ])
+        result = cargar_cursos_seguimiento(path)
+        assert set(result) == {"Curso A"}
+        assert result["Curso A"]["url"] == "https://x.com/1"
+
+    def test_campo_seguimiento_ausente_no_cuenta(self, tmp_path: Path):
+        path = self._write(tmp_path, [{"nombre": "Curso A", "url": "https://x.com/1"}])
+        assert cargar_cursos_seguimiento(path) == {}
+
+    def test_archivo_inexistente(self, tmp_path: Path):
+        assert cargar_cursos_seguimiento(tmp_path / "nope.json") == {}
+
+    def test_json_invalido(self, tmp_path: Path):
+        path = tmp_path / "course_links.json"
+        path.write_text("{ no es json", encoding="utf-8")
+        assert cargar_cursos_seguimiento(path) == {}
+
+    def test_ignora_entradas_sin_nombre(self, tmp_path: Path):
+        path = self._write(tmp_path, [{"url": "https://x.com/1", "seguimiento": True}])
+        assert cargar_cursos_seguimiento(path) == {}

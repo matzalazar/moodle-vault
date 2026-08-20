@@ -129,3 +129,47 @@ class TestResetSemanasRecientes:
         assert p.read_text() == original_content
         # No deben quedar archivos .tmp huérfanos
         assert list(tmp_path.glob("*.tmp")) == []
+
+
+class TestFiltroSeguimiento:
+    def _write(self, tree_dir: Path, filename: str, curso: str, data: dict) -> Path:
+        data = {**data, "curso": curso}
+        p = tree_dir / filename
+        p.write_text(json.dumps(data), encoding="utf-8")
+        return p
+
+    def test_ignora_curso_sin_seguimiento(self, tmp_path: Path):
+        fecha_fin = (datetime.date.today() - datetime.timedelta(days=3)).isoformat()
+        data = _tree([_semana(fecha_fin, [_tema("A", revisado=True)])])
+        self._write(tmp_path, "viejo.json", "Curso Viejo", data)
+
+        reset_semanas_recientes(tmp_path, semanas_atras=1, cursos_seguimiento={})
+
+        result = json.loads((tmp_path / "viejo.json").read_text())
+        assert result["semanas"][0]["temas"][0].get("revisado") is True
+
+    def test_resetea_solo_cursos_en_seguimiento(self, tmp_path: Path):
+        fecha_fin = (datetime.date.today() - datetime.timedelta(days=3)).isoformat()
+        data = _tree([_semana(fecha_fin, [_tema("A", revisado=True)])])
+        self._write(tmp_path, "activo.json", "Curso Activo", data)
+        self._write(tmp_path, "viejo.json", "Curso Viejo", data)
+
+        seguimiento = {"Curso Activo": {"nombre": "Curso Activo", "url": "https://x.com/1"}}
+        reset_semanas_recientes(tmp_path, semanas_atras=1, cursos_seguimiento=seguimiento)
+
+        activo = json.loads((tmp_path / "activo.json").read_text())
+        viejo = json.loads((tmp_path / "viejo.json").read_text())
+        assert "revisado" not in activo["semanas"][0]["temas"][0]
+        assert viejo["semanas"][0]["temas"][0].get("revisado") is True
+
+    def test_sin_filtro_procesa_todos(self, tmp_path: Path):
+        fecha_fin = (datetime.date.today() - datetime.timedelta(days=3)).isoformat()
+        data = _tree([_semana(fecha_fin, [_tema("A", revisado=True)])])
+        self._write(tmp_path, "a.json", "Curso A", data)
+        self._write(tmp_path, "b.json", "Curso B", data)
+
+        reset_semanas_recientes(tmp_path, semanas_atras=1)
+
+        for name in ("a.json", "b.json"):
+            result = json.loads((tmp_path / name).read_text())
+            assert "revisado" not in result["semanas"][0]["temas"][0]

@@ -18,19 +18,32 @@ import datetime
 import tempfile
 from pathlib import Path
 
-from scripts.platform import load_platform
+from scripts.platform import load_platform, cargar_cursos_seguimiento
 from scripts.utils import setup_logging
 
 logger = logging.getLogger(__name__)
 
 
-def reset_semanas_recientes(tree_dir: Path, semanas_atras: int) -> None:
+def reset_semanas_recientes(
+    tree_dir: Path,
+    semanas_atras: int,
+    cursos_seguimiento: dict[str, dict] | None = None,
+) -> None:
+    """Resetea el flag revisado de las semanas recientes.
+
+    Si se pasa cursos_seguimiento, se ignoran los árboles cuyo curso ya no está
+    marcado para seguimiento; de lo contrario se procesan todos los del directorio.
+    """
     cutoff = datetime.date.today() - datetime.timedelta(weeks=semanas_atras)
     logger.info("resetting topics in weeks with fecha_fin >= %s", cutoff.isoformat())
 
     for filepath in tree_dir.glob("*.json"):
         with open(filepath, "r", encoding="utf-8") as f:
             curso_json = json.load(f)
+
+        if cursos_seguimiento is not None and curso_json.get("curso") not in cursos_seguimiento:
+            logger.debug("course not tracked, skipping: %s", filepath.name)
+            continue
 
         modificado = False
         for semana in curso_json.get("semanas", []):
@@ -91,7 +104,11 @@ def main() -> None:
         logger.warning("tree directory not found: %s", platform.tree_dir)
         return
 
-    reset_semanas_recientes(platform.tree_dir, args.semanas)
+    reset_semanas_recientes(
+        platform.tree_dir,
+        args.semanas,
+        cargar_cursos_seguimiento(platform.course_links_path),
+    )
 
 
 if __name__ == "__main__":

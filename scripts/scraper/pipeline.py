@@ -9,7 +9,7 @@ import sys
 import logging
 import argparse
 
-from scripts.platform import load_platform
+from scripts.platform import load_platform, cargar_cursos_seguimiento
 from scripts.scraper.session import get_authenticated_browser
 from scripts.scraper import fetch_links, extract_course_tree, download_files
 from scripts.scraper.reset_semanas import reset_semanas_recientes
@@ -38,7 +38,11 @@ def main() -> None:
         fetch_links.run(browser, platform)
         extract_course_tree.run(browser, platform)
         if args.rescrape > 0:
-            reset_semanas_recientes(platform.tree_dir, args.rescrape)
+            reset_semanas_recientes(
+                platform.tree_dir,
+                args.rescrape,
+                cargar_cursos_seguimiento(platform.course_links_path),
+            )
         download_files.run(browser, platform)
     except Exception as e:
         logger.error("pipeline error: %s", e)

@@ -25,7 +25,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-from scripts.platform import load_platform, PlatformConfig
+from scripts.platform import load_platform, cargar_cursos_seguimiento, PlatformConfig
 from scripts.scraper.session import get_authenticated_browser
 from scripts.scraper.selectors import MOD_URL, MOD_RESOURCE, MOD_FOLDER, MOD_PAGE, YOUTUBE_DOMAINS
 from scripts.utils import registrar_descarga_log, sanitizar_directorio, sanitizar_nombre_archivo, EXTENSIONES_CONOCIDAS, setup_logging
@@ -202,28 +202,17 @@ def procesar_curso(
     browser: webdriver.Chrome,
     curso_json: dict,
     curso_file_path: Path,
-    course_links_path: Path,
+    curso_entry: dict,
     course_dir: Path,
     platform_name: str,
     curso_dir_nombre: str,
     http_session: requests.Session,
 ) -> None:
-    with open(course_links_path, "r", encoding="utf-8") as f:
-        all_courses = json.load(f)
-
     curso_nombre = curso_json.get("curso", "(sin nombre)")
-    curso_entry = next((c for c in all_courses if c.get("nombre") == curso_nombre), None)
-    if curso_entry is None:
-        logger.warning(
-            "course not found in %s, skipping: %s",
-            course_links_path,
-            curso_nombre,
-        )
-        return
 
     curso_url = curso_entry.get("url")
     if not curso_url:
-        logger.warning("course has no URL in %s, skipping: %s", course_links_path, curso_nombre)
+        logger.warning("course has no URL, skipping: %s", curso_nombre)
         return
 
     # Navegar al curso para que las cookies del dominio estén activas
@@ -383,20 +372,32 @@ def run(browser: webdriver.Chrome, platform: PlatformConfig) -> None:
     """Descarga archivos de cursos usando el browser provisto. No crea ni cierra el browser."""
     platform.course_dir.mkdir(parents=True, exist_ok=True)
 
+    # Los árboles JSON persisten en disco aunque el curso deje de seguirse, así
+    # que hay que filtrarlos contra course_links.json en cada ejecución.
+    cursos_seguimiento = cargar_cursos_seguimiento(platform.course_links_path)
+    if not cursos_seguimiento:
+        logger.warning("no courses marked for tracking, nothing to download.")
+        return
+
     # Ordenar cursos por código numérico para que los directorios de descarga
     # queden numerados consistentemente entre ejecuciones (01_, 02_, ...).
     cursos_info = []
     for filepath in platform.tree_dir.glob("*.json"):
         with open(filepath, "r", encoding="utf-8") as f:
             curso_json = json.load(f)
-        codigo, nombre_materia = extraer_info_curso(curso_json["curso"])
-        cursos_info.append((codigo, nombre_materia, filepath, curso_json))
+        curso_nombre = curso_json.get("curso")
+        curso_entry = cursos_seguimiento.get(curso_nombre)
+        if curso_entry is None:
+            logger.info("course not tracked, skipping: %s", curso_nombre or filepath.name)
+            continue
+        codigo, nombre_materia = extraer_info_curso(curso_nombre)
+        cursos_info.append((codigo, nombre_materia, filepath, curso_json, curso_entry))
 
     cursos_info.sort(key=lambda x: x[0])
 
     http_session = _build_http_session()
     try:
-        for idx, (codigo, nombre_materia, filepath, curso_json) in enumerate(cursos_info):
+        for idx, (codigo, nombre_materia, filepath, curso_json, curso_entry) in enumerate(cursos_info):
             nombre_sanitizado = sanitizar_directorio(nombre_materia, maxlen=55)
             curso_dir_nombre = f"{idx + 1:02d}_{nombre_sanitizado}"
             logger.info("processing downloads for: %s", curso_dir_nombre)
@@ -404,7 +405,7 @@ def run(browser: webdriver.Chrome, platform: PlatformConfig) -> None:
                 browser,
                 curso_json,
                 filepath,
-                platform.course_links_path,
+                curso_entry,
                 platform.course_dir,
                 platform.name,
                 curso_dir_nombre,

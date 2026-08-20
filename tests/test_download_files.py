@@ -1,4 +1,8 @@
+import json
+
 import pytest
+
+from scripts.scraper import download_files
 from scripts.scraper.download_files import (
     tipo_actividad,
     es_link_descargable,
@@ -156,3 +160,69 @@ class TestExtraerInfoCurso:
         nombre = "2026-1ºC-200-MATERIA-TU"
         codigo, _ = extraer_info_curso(nombre)
         assert isinstance(codigo, int)
+
+
+class TestRunFiltraSeguimiento:
+    def _platform(self, tmp_path):
+        from scripts.platform import PlatformConfig
+
+        config_dir = tmp_path / "config"
+        config_dir.mkdir()
+        tree_dir = tmp_path / "trees"
+        tree_dir.mkdir()
+        return PlatformConfig(
+            name="test",
+            display_name="Test",
+            login_url="https://campus.example/login",
+            theme="classic",
+            course_links_path=config_dir / "course_links.json",
+            tree_dir=tree_dir,
+            course_dir=tmp_path / "course",
+        )
+
+    def _write_tree(self, platform, filename, curso):
+        (platform.tree_dir / filename).write_text(
+            json.dumps({"curso": curso, "semanas": []}), encoding="utf-8"
+        )
+
+    def test_solo_procesa_cursos_en_seguimiento(self, tmp_path, monkeypatch):
+        platform = self._platform(tmp_path)
+        platform.course_links_path.write_text(
+            json.dumps([
+                {"nombre": "Curso Activo", "url": "https://x.com/1", "seguimiento": True},
+                {"nombre": "Curso Viejo", "url": "https://x.com/2", "seguimiento": False},
+            ]),
+            encoding="utf-8",
+        )
+        self._write_tree(platform, "activo.json", "Curso Activo")
+        self._write_tree(platform, "viejo.json", "Curso Viejo")
+
+        procesados = []
+        monkeypatch.setattr(
+            download_files,
+            "procesar_curso",
+            lambda browser, curso_json, *a, **kw: procesados.append(curso_json["curso"]),
+        )
+
+        download_files.run(browser=None, platform=platform)
+
+        assert procesados == ["Curso Activo"]
+
+    def test_sin_cursos_en_seguimiento_no_procesa_nada(self, tmp_path, monkeypatch):
+        platform = self._platform(tmp_path)
+        platform.course_links_path.write_text(
+            json.dumps([{"nombre": "Curso Viejo", "url": "https://x.com/2", "seguimiento": False}]),
+            encoding="utf-8",
+        )
+        self._write_tree(platform, "viejo.json", "Curso Viejo")
+
+        procesados = []
+        monkeypatch.setattr(
+            download_files,
+            "procesar_curso",
+            lambda browser, curso_json, *a, **kw: procesados.append(curso_json["curso"]),
+        )
+
+        download_files.run(browser=None, platform=platform)
+
+        assert procesados == []

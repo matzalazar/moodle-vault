@@ -20,7 +20,7 @@ import typer
 from dotenv import load_dotenv
 from loguru import logger
 
-from scripts.platform import list_platforms, load_platform
+from scripts.platform import cargar_cursos_seguimiento, list_platforms, load_platform
 
 load_dotenv()
 
@@ -250,7 +250,11 @@ def run(
         fetch_links.run(browser, platform_cfg)
         extract_course_tree.run(browser, platform_cfg)
         if rescrape_val > 0:
-            reset_semanas_recientes(platform_cfg.tree_dir, rescrape_val)
+            reset_semanas_recientes(
+                platform_cfg.tree_dir,
+                rescrape_val,
+                cargar_cursos_seguimiento(platform_cfg.course_links_path),
+            )
         download_files.run(browser, platform_cfg)
     except Exception as exc:
         logger.error(f"Pipeline error: {exc}")
@@ -479,7 +483,11 @@ def download(
 
     try:
         if rescrape_val > 0:
-            reset_semanas_recientes(platform_cfg.tree_dir, rescrape_val)
+            reset_semanas_recientes(
+                platform_cfg.tree_dir,
+                rescrape_val,
+                cargar_cursos_seguimiento(platform_cfg.course_links_path),
+            )
         download_files.run(browser, platform_cfg)
     except Exception as exc:
         logger.error(f"Download error: {exc}")

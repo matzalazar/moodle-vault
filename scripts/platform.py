@@ -45,6 +45,28 @@ def load_platform(name: str) -> PlatformConfig:
     )
 
 
+def cargar_cursos_seguimiento(course_links_path: Path) -> dict[str, dict]:
+    """Devuelve {nombre: curso} solo para los cursos marcados con seguimiento.
+
+    Las etapas posteriores al scraping (reset y descarga) recorren los árboles
+    JSON guardados en disco, que persisten aunque el curso deje de seguirse.
+    Filtrar por este mapa evita reprocesar cursos con "seguimiento": false.
+    """
+    if not course_links_path.exists():
+        logger.warning("course links file not found: %s", course_links_path)
+        return {}
+    try:
+        cursos = json.loads(course_links_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        logger.error("could not parse %s: %s", course_links_path, e)
+        return {}
+    return {
+        c["nombre"]: c
+        for c in cursos
+        if c.get("seguimiento", False) and c.get("nombre")
+    }
+
+
 def list_platforms() -> list[str]:
     d = BASE_DIR / "config" / "platforms"
     return [f.stem for f in d.glob("*.json")] if d.exists() else []
